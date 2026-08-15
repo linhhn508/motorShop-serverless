@@ -1,6 +1,3 @@
-import json
-
-
 def test_get_products_empty_returns_200(flask_client):
     response = flask_client.get("/api/products/")
     assert response.status_code == 200

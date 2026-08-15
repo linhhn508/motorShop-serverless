@@ -3,7 +3,6 @@ import uuid
 from functools import wraps
 
 import jwt
-from boto3.dynamodb.conditions import Attr
 from flask import Blueprint, jsonify, request
 
 from app.db import get_table
