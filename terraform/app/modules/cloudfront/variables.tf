@@ -6,27 +6,15 @@ variable "environment" {
   type = string
 }
 
-variable "frontend_bucket_id" {
+variable "project_bucket_id" {
   type = string
 }
 
-variable "frontend_bucket_arn" {
+variable "project_bucket_arn" {
   type = string
 }
 
-variable "frontend_bucket_regional_domain_name" {
-  type = string
-}
-
-variable "images_bucket_id" {
-  type = string
-}
-
-variable "images_bucket_arn" {
-  type = string
-}
-
-variable "images_bucket_regional_domain_name" {
+variable "project_bucket_regional_domain_name" {
   type = string
 }
 

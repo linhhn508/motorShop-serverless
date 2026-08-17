@@ -26,13 +26,6 @@ module "iam" {
   ]
 }
 
-module "s3" {
-  source       = "./modules/s3"
-  project_name = var.project_name
-  bucket_names = ["images", "frontend"]
-}
-
-
 module "lambda" {
   source               = "./modules/lambda"
   project_name         = var.project_name
@@ -52,12 +45,8 @@ module "apigateway" {
   lambda_function_name = module.lambda.function_name
 }
 
-data "aws_s3_bucket" "images" {
-  bucket = module.s3.project_bucket_names["images"]
-}
-
-data "aws_s3_bucket" "frontend" {
-  bucket = module.s3.project_bucket_names["frontend"]
+data "aws_s3_bucket" "project" {
+  bucket = var.project_bucket
 }
 
 locals {
@@ -70,12 +59,9 @@ module "cloudfront" {
   source                               = "./modules/cloudfront"
   project_name                         = var.project_name
   environment                          = var.environment
-  frontend_bucket_id                   = data.aws_s3_bucket.frontend.id
-  frontend_bucket_arn                  = data.aws_s3_bucket.frontend.arn
-  frontend_bucket_regional_domain_name = data.aws_s3_bucket.frontend.bucket_regional_domain_name
-  images_bucket_id                     = data.aws_s3_bucket.images.id
-  images_bucket_arn                    = data.aws_s3_bucket.images.arn
-  images_bucket_regional_domain_name   = data.aws_s3_bucket.images.bucket_regional_domain_name
+  project_bucket_id                     = data.aws_s3_bucket.project.id
+  project_bucket_arn                    = data.aws_s3_bucket.project.arn
+  project_bucket_regional_domain_name   = data.aws_s3_bucket.project.bucket_regional_domain_name
   apigateway_url                       = local.api_domain
   apigateway_stage_name                = module.apigateway.stage_name
 }

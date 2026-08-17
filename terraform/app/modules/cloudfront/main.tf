@@ -38,16 +38,18 @@ resource "aws_cloudfront_distribution" "main" {
 
   # Origin 1: Frontend S3 bucket (default)
   origin {
-    domain_name              = var.frontend_bucket_regional_domain_name
+    domain_name              = var.project_bucket_regional_domain_name
     origin_id                = "frontend-s3"
     origin_access_control_id = aws_cloudfront_origin_access_control.frontend.id
+    origin_path = "/frontend"
   }
 
   # Origin 2: Images S3 bucket
   origin {
-    domain_name              = var.images_bucket_regional_domain_name
+    domain_name              = var.project_bucket_regional_domain_name
     origin_id                = "images-s3"
     origin_access_control_id = aws_cloudfront_origin_access_control.images.id
+    origin_path = "/images"
   }
 
   # Origin 3: ALB (backend API)
@@ -160,8 +162,8 @@ resource "aws_cloudfront_distribution" "main" {
 }
 
 # --- S3 Bucket Policies for CloudFront OAC ---
-resource "aws_s3_bucket_policy" "frontend" {
-  bucket = var.frontend_bucket_id
+resource "aws_s3_bucket_policy" "project" {
+  bucket = var.project_bucket_id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -173,31 +175,7 @@ resource "aws_s3_bucket_policy" "frontend" {
           Service = "cloudfront.amazonaws.com"
         }
         Action   = "s3:GetObject"
-        Resource = "${var.frontend_bucket_arn}/*"
-        Condition = {
-          StringEquals = {
-            "AWS:SourceArn" = aws_cloudfront_distribution.main.arn
-          }
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_s3_bucket_policy" "images" {
-  bucket = var.images_bucket_id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowCloudFrontServicePrincipal"
-        Effect = "Allow"
-        Principal = {
-          Service = "cloudfront.amazonaws.com"
-        }
-        Action   = "s3:GetObject"
-        Resource = "${var.images_bucket_arn}/*"
+        Resource = "${var.project_bucket_arn}/*"
         Condition = {
           StringEquals = {
             "AWS:SourceArn" = aws_cloudfront_distribution.main.arn
