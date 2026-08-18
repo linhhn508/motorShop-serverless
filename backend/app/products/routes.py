@@ -45,13 +45,23 @@ def list_products():
     if search:
         items = [i for i in items if search in i.get("name", "").lower()]
 
-    return jsonify({"products": items}), 200
+    return jsonify(items), 200
 
 
-@products_bp.route("/<product_id>")
+@products_bp.route("/categories/")
+def list_categories():
+    table = get_table(os.environ.get("PRODUCTS_TABLE", "products"))
+    response = table.scan(ProjectionExpression="category")
+    items = response.get("Items", [])
+    print(items)
+    categories = set(i.get("category") for i in items if i.get("category"))
+    return jsonify(list(categories)), 200
+
+
+@products_bp.route("/<product_id>/info")
 def get_product(product_id):
     table = get_table(os.environ.get("PRODUCTS_TABLE", "products"))
-    response = table.get_item(Key={"productId": product_id})
+    response = table.get_item(Key={"id": product_id})
     item = response.get("Item")
     if not item:
         return jsonify({"error": "product not found"}), 404
@@ -63,13 +73,13 @@ def get_product(product_id):
 def create_product():
     data = request.get_json(silent=True) or {}
     product_id = str(uuid.uuid4())
-    item = {"productId": product_id, **data}
+    item = {"id": product_id, **data}
     table = get_table(os.environ.get("PRODUCTS_TABLE", "products"))
     from decimal import Decimal
     if isinstance(item.get("price"), float):
         item["price"] = Decimal(str(item["price"]))
     table.put_item(Item=item)
-    return jsonify({"productId": product_id}), 201
+    return jsonify({"id": product_id}), 201
 
 
 @products_bp.route("/<product_id>", methods=["PUT"])
@@ -77,16 +87,16 @@ def create_product():
 def update_product(product_id):
     data = request.get_json(silent=True) or {}
     table = get_table(os.environ.get("PRODUCTS_TABLE", "products"))
-    response = table.get_item(Key={"productId": product_id})
+    response = table.get_item(Key={"id": product_id})
     if not response.get("Item"):
         return jsonify({"error": "product not found"}), 404
-    table.put_item(Item={"productId": product_id, **data})
-    return jsonify({"productId": product_id}), 200
+    table.put_item(Item={"id": product_id, **data})
+    return jsonify({"id": product_id}), 200
 
 
 @products_bp.route("/<product_id>", methods=["DELETE"])
 @require_admin
 def delete_product(product_id):
     table = get_table(os.environ.get("PRODUCTS_TABLE", "products"))
-    table.delete_item(Key={"productId": product_id})
+    table.delete_item(Key={"id": product_id})
     return jsonify({"message": "deleted"}), 200
