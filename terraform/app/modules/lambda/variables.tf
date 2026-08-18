@@ -11,12 +11,6 @@ variable "lambda_package_path" {
 variable "products_table_name" {
   type = string
 }
-variable "feedback_table_name" {
-  type = string
-}
-variable "contacts_table_name" {
-  type = string
-}
 variable "jwt_secret" {
   type      = string
   sensitive = true

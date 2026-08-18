@@ -16,8 +16,6 @@ module "iam" {
   project_name = var.project_name
   dynamodb_table_arns = [
     module.dynamodb.products_table_arn,
-    module.dynamodb.feedback_table_arn,
-    module.dynamodb.contacts_table_arn
   ]
   ssm_parameter_arns = [
     module.ssm.admin_password_arn,
@@ -31,8 +29,6 @@ module "lambda" {
   project_name         = var.project_name
   lambda_exec_role_arn = module.iam.lambda_exec_role_arn
   products_table_name  = module.dynamodb.products_table_name
-  feedback_table_name  = module.dynamodb.feedback_table_name
-  contacts_table_name  = module.dynamodb.contacts_table_name
   jwt_secret           = var.jwt_secret
   admin_username       = var.admin_username
   admin_password       = var.admin_password

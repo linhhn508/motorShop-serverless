@@ -1,13 +1,6 @@
 # --- Origin Access Control for S3 ---
-resource "aws_cloudfront_origin_access_control" "frontend" {
-  name                              = "${var.project_name}-frontend-oac"
-  origin_access_control_origin_type = "s3"
-  signing_behavior                  = "always"
-  signing_protocol                  = "sigv4"
-}
-
-resource "aws_cloudfront_origin_access_control" "images" {
-  name                              = "${var.project_name}-images-oac"
+resource "aws_cloudfront_origin_access_control" "s3_bucket" {
+  name                              = "${var.project_name}-oac"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"
@@ -40,7 +33,7 @@ resource "aws_cloudfront_distribution" "main" {
   origin {
     domain_name              = var.project_bucket_regional_domain_name
     origin_id                = "frontend-s3"
-    origin_access_control_id = aws_cloudfront_origin_access_control.frontend.id
+    origin_access_control_id = aws_cloudfront_origin_access_control.s3_bucket.id
     origin_path = "/frontend"
   }
 
@@ -48,7 +41,7 @@ resource "aws_cloudfront_distribution" "main" {
   origin {
     domain_name              = var.project_bucket_regional_domain_name
     origin_id                = "images-s3"
-    origin_access_control_id = aws_cloudfront_origin_access_control.images.id
+    origin_access_control_id = aws_cloudfront_origin_access_control.s3_bucket.id
     origin_path = "/images"
   }
 

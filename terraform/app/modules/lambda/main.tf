@@ -10,8 +10,6 @@ resource "aws_lambda_function" "api" {
   environment {
     variables = {
       PRODUCTS_TABLE = var.products_table_name
-      FEEDBACK_TABLE = var.feedback_table_name
-      CONTACTS_TABLE = var.contacts_table_name
       JWT_SECRET     = var.jwt_secret
       ADMIN_USERNAME = var.admin_username
       ADMIN_PASSWORD = var.admin_password
