@@ -27,9 +27,9 @@ def dynamodb_tables(aws_mock):
 
     products_table = ddb.create_table(
         TableName="products",
-        KeySchema=[{"AttributeName": "productId", "KeyType": "HASH"}],
+        KeySchema=[{"AttributeName": "id", "KeyType": "HASH"}],
         AttributeDefinitions=[
-            {"AttributeName": "productId", "AttributeType": "S"},
+            {"AttributeName": "id", "AttributeType": "S"},
             {"AttributeName": "category", "AttributeType": "S"},
         ],
         GlobalSecondaryIndexes=[
