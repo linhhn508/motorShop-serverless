@@ -25,6 +25,7 @@ on:
 env:
   AWS_REGION: ap-southeast-1
   TF_WORKING_DIR: terraform/app
+  LAMBDA_PACKAGE_PATH: output/package.zip
 
 jobs:
   format:
@@ -74,6 +75,7 @@ jobs:
           TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
           TF_VAR_project_bucket: ${{ secrets.AWS_PROJECT_S3_BUCKET }}
           TF_VAR_alert_email: ${{ vars.PERSONAL_EMAIL }}
+          TF_VAR_lambda_package_path: ${{ env.LAMBDA_PACKAGE_PATH }}
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform plan -no-color
 
@@ -110,7 +112,8 @@ jobs:
           TF_VAR_admin_username: ${{ secrets.ADMIN_USERNAME }}
           TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
           TF_VAR_project_bucket: ${{ secrets.AWS_PROJECT_S3_BUCKET }}
-          TF_VAR_alarm_email: ${{ vars.PERSONAL_EMAIL }}
+          TF_VAR_alert_email: ${{ vars.PERSONAL_EMAIL }}
+          TF_VAR_lambda_package_path: ${{ env.LAMBDA_PACKAGE_PATH }}
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform apply -auto-approve -no-color
 
@@ -121,7 +124,8 @@ jobs:
           TF_VAR_admin_username: ${{ secrets.ADMIN_USERNAME }}
           TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
           TF_VAR_project_bucket: ${{ secrets.AWS_PROJECT_S3_BUCKET }}
-          TF_VAR_alarm_email: ${{ vars.PERSONAL_EMAIL }}
+          TF_VAR_alert_email: ${{ vars.PERSONAL_EMAIL }}
+          TF_VAR_lambda_package_path: ${{ env.LAMBDA_PACKAGE_PATH }}
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform destroy -auto-approve -no-color
 

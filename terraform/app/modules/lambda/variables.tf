@@ -5,8 +5,7 @@ variable "lambda_exec_role_arn" {
   type = string
 }
 variable "lambda_package_path" {
-  type    = string
-  default = "../../backend/package.zip"
+  type = string
 }
 variable "products_table_name" {
   type = string

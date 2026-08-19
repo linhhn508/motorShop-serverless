@@ -32,6 +32,7 @@ module "lambda" {
   jwt_secret           = var.jwt_secret
   admin_username       = var.admin_username
   admin_password       = var.admin_password
+  lambda_package_path  = var.lambda_package_path
 }
 
 module "apigateway" {

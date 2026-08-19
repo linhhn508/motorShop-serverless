@@ -19,6 +19,11 @@ variable "admin_username" {
   type = string
 }
 
+variable "lambda_package_path" {
+  type    = string
+  default = "../../backend/package.zip"
+}
+
 variable "admin_password" {
   type      = string
   sensitive = true
