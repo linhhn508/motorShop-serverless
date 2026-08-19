@@ -52,12 +52,12 @@ locals {
 
 
 module "cloudfront" {
-  source                               = "./modules/cloudfront"
-  project_name                         = var.project_name
-  environment                          = var.environment
-  project_bucket_id                     = data.aws_s3_bucket.project.id
-  project_bucket_arn                    = data.aws_s3_bucket.project.arn
-  project_bucket_regional_domain_name   = data.aws_s3_bucket.project.bucket_regional_domain_name
-  apigateway_url                       = local.api_domain
-  apigateway_stage_name                = module.apigateway.stage_name
+  source                              = "./modules/cloudfront"
+  project_name                        = var.project_name
+  environment                         = var.environment
+  project_bucket_id                   = data.aws_s3_bucket.project.id
+  project_bucket_arn                  = data.aws_s3_bucket.project.arn
+  project_bucket_regional_domain_name = data.aws_s3_bucket.project.bucket_regional_domain_name
+  apigateway_url                      = local.api_domain
+  apigateway_stage_name               = module.apigateway.stage_name
 }

@@ -34,7 +34,7 @@ resource "aws_cloudfront_distribution" "main" {
     domain_name              = var.project_bucket_regional_domain_name
     origin_id                = "frontend-s3"
     origin_access_control_id = aws_cloudfront_origin_access_control.s3_bucket.id
-    origin_path = "/frontend"
+    origin_path              = "/frontend"
   }
 
   # Origin 2: Images S3 bucket
@@ -42,7 +42,7 @@ resource "aws_cloudfront_distribution" "main" {
     domain_name              = var.project_bucket_regional_domain_name
     origin_id                = "images-s3"
     origin_access_control_id = aws_cloudfront_origin_access_control.s3_bucket.id
-    origin_path = "/images"
+    origin_path              = "/images"
   }
 
   # Origin 3: ALB (backend API)

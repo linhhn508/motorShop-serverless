@@ -1,0 +1,134 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches: [main]
+    paths: ['terraform/**']
+  pull_request:
+    branches: [main]
+    paths: ['terraform/**']
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform action to perform'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+      app_version:
+        description: 'App version to deploy (only for apply action)'
+        required: false
+        type: string
+
+env:
+  AWS_REGION: ap-southeast-1
+  TF_WORKING_DIR: terraform/app
+
+jobs:
+  format:
+    name: Format check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ">= 1.5"
+
+      - name: Terraform fmt
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform fmt -check -recursive
+
+  plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    needs: format
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ">= 1.5"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Terraform plan
+        env:
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_admin_username: ${{ secrets.ADMIN_USERNAME }}
+          TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
+          TF_VAR_project_bucket: ${{ secrets.AWS_PROJECT_S3_BUCKET }}
+          TF_VAR_alert_email: ${{ vars.PERSONAL_EMAIL }}
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform plan -no-color
+
+
+  deploy:
+    name: Terraform Apply/Destroy
+    runs-on: ubuntu-latest
+    needs: plan
+    if: github.event_name == 'workflow_dispatch' && (inputs.action == 'apply' || inputs.action == 'destroy')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ">= 1.5"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Terraform apply
+        if: inputs.action == 'apply'
+        env:
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_admin_username: ${{ secrets.ADMIN_USERNAME }}
+          TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
+          TF_VAR_project_bucket: ${{ secrets.AWS_PROJECT_S3_BUCKET }}
+          TF_VAR_alarm_email: ${{ vars.PERSONAL_EMAIL }}
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -auto-approve -no-color
+
+      - name: Terraform destroy
+        if: inputs.action == 'destroy'
+        env:
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_admin_username: ${{ secrets.ADMIN_USERNAME }}
+          TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
+          TF_VAR_project_bucket: ${{ secrets.AWS_PROJECT_S3_BUCKET }}
+          TF_VAR_alarm_email: ${{ vars.PERSONAL_EMAIL }}
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform destroy -auto-approve -no-color
+
+      - name: Sync frontend to S3 (after apply)
+        if: inputs.action == 'apply'
+        env:
+          FRONTEND_VERSION: ${{ steps.manifest.outputs.frontend_version }}
+        run: |
+          echo "Syncing frontend v$FRONTEND_VERSION to S3..."
+          echo "aws s3 sync ... (handled by Terraform/CloudFront)"
