@@ -11,18 +11,20 @@ env:
   BUCKET_NAME: my-frontend-bucket
 
 jobs:
-  build-frontend:
-    name: Build Frontend
+  check-versions:
+    name: Check Version Changes
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      should-publish: ${{ steps.check.outputs.should-publish }}
+      frontend-version: ${{ steps.frontend-version.outputs.version }}
+      backend-version: ${{ steps.backend-version.outputs.version }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
       - name: Read frontend version
-        id: version
+        id: frontend-version
         working-directory: frontend
         run: |
           VERSION=$(node -p "require('./package.json').version")
@@ -32,6 +34,65 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Frontend version: $VERSION"
+
+      - name: Read backend version
+        id: backend-version
+        working-directory: backend
+        run: |
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid semver in pyproject.toml: $VERSION"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Backend version: $VERSION"
+
+      - name: Check if versions changed from latest release
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FRONTEND_VERSION: ${{ steps.frontend-version.outputs.version }}
+          BACKEND_VERSION: ${{ steps.backend-version.outputs.version }}
+        run: |
+          # Check if the repo has any releases
+          LATEST_VERSION=$(gh release view --repo "$GITHUB_REPOSITORY" 2>/dev/null || true)
+
+          if [ -z "$LATEST_VERSION" ]; then
+            echo "No previous release found — will publish"
+            echo "should-publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          LATEST_VERSION_BODY=$(gh release view --repo "$GITHUB_REPOSITORY" --json body -q '.body' 2>/dev/null || true)
+
+          if [ -z "$LATEST_VERSION_BODY" ]; then
+            echo "Could not retrieve latest release body — failing the check"
+            exit 1
+          fi
+
+          PREV_FE=$(echo "$LATEST_VERSION_BODY" | grep -oP 'Frontend: \K[^ |]+')
+          PREV_BE=$(echo "$LATEST_VERSION_BODY" | grep -oP 'Backend: \K[^ |]+')
+
+          echo "Previous: frontend=$PREV_FE backend=$PREV_BE"
+          echo "Current:  frontend=$FRONTEND_VERSION backend=$BACKEND_VERSION"
+
+          if [ "$PREV_FE" = "$FRONTEND_VERSION" ] && [ "$PREV_BE" = "$BACKEND_VERSION" ]; then
+            echo "::warning::Both versions unchanged — skipping publish and release"
+            echo "should-publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version change detected — will publish"
+            echo "should-publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    needs: check-versions
+    if: needs.check-versions.outputs.should-publish == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
 
       - name: Install dependencies
         run: npm ci
@@ -55,24 +116,12 @@ jobs:
   build-backend:
     name: Build Backend
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
+    needs: check-versions
+    if: needs.check-versions.outputs.should-publish == 'true'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - name: Read backend version
-        id: version
-        working-directory: backend
-        run: |
-          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Invalid semver in pyproject.toml: $VERSION"
-            exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Backend version: $VERSION"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v9.0.0
@@ -112,7 +161,7 @@ jobs:
   integration-test:
     name: Integration Tests
     runs-on: ubuntu-latest
-    needs: [build-frontend, build-backend]
+    needs: [check-versions, build-frontend, build-backend]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -121,61 +170,15 @@ jobs:
         run: |
           echo "============================================"
           echo "  Integration tests placeholder"
-          echo "  Frontend version: ${{ needs.build-frontend.outputs.version }}"
-          echo "  Backend version: ${{ needs.build-backend.outputs.version }}"
+          echo "  Frontend version: ${{ needs.check-versions.outputs.frontend-version }}"
+          echo "  Backend version: ${{ needs.check-versions.outputs.backend-version }}"
           echo "  TODO: Add e2e/integration tests here"
           echo "============================================"
-
-  check-versions:
-    name: Check Version Changes
-    runs-on: ubuntu-latest
-    needs: [integration-test, build-frontend, build-backend]
-    outputs:
-      should-publish: ${{ steps.check.outputs.should-publish }}
-    steps:
-      - name: Check if versions changed from latest release
-        id: check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FRONTEND_VERSION: ${{ needs.build-frontend.outputs.version }}
-          BACKEND_VERSION: ${{ needs.build-backend.outputs.version }}
-        run: |
-          # Try to download manifest from latest release
-          LATEST_MANIFEST=$(gh release view --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[] | select(.name=="manifest.yaml") | .url' 2>/dev/null || true)
-
-          if [ -z "$LATEST_MANIFEST" ]; then
-            echo "No previous release found — will publish"
-            echo "should-publish=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          gh release download --repo "$GITHUB_REPOSITORY" --pattern "manifest.yaml" --dir /tmp 2>/dev/null || true
-
-          if [ ! -f /tmp/manifest.yaml ]; then
-            echo "Could not download previous manifest — will publish"
-            echo "should-publish=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          PREV_FE=$(grep -A1 "^frontend:" /tmp/manifest.yaml | grep "version:" | awk '{print $2}' | tr -d '"')
-          PREV_BE=$(grep -A1 "^backend:" /tmp/manifest.yaml | grep "version:" | awk '{print $2}' | tr -d '"')
-
-          echo "Previous: frontend=$PREV_FE backend=$PREV_BE"
-          echo "Current:  frontend=$FRONTEND_VERSION backend=$BACKEND_VERSION"
-
-          if [ "$PREV_FE" = "$FRONTEND_VERSION" ] && [ "$PREV_BE" = "$BACKEND_VERSION" ]; then
-            echo "::warning::Both versions unchanged — skipping publish and release"
-            echo "should-publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "Version change detected — will publish"
-            echo "should-publish=true" >> "$GITHUB_OUTPUT"
-          fi
 
   publish:
     name: Publish Artifacts
     runs-on: ubuntu-latest
-    needs: [check-versions, build-frontend, build-backend]
-    if: needs.check-versions.outputs.should-publish == 'true'
+    needs: [check-versions,integration-test]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -196,7 +199,7 @@ jobs:
 
       - name: Upload frontend to S3
         env:
-          FRONTEND_VERSION: ${{ needs.build-frontend.outputs.version }}
+          FRONTEND_VERSION: ${{ needs.check-versions.outputs.frontend-version }}
         run: |
           echo "Uploading frontend v$FRONTEND_VERSION to S3..."
           echo "aws s3 sync frontend-dist/ s3://\$BUCKET_NAME --delete"
@@ -210,7 +213,7 @@ jobs:
 
       - name: Upload backend to Lambda
         env:
-          BACKEND_VERSION: ${{ needs.build-backend.outputs.version }}
+          BACKEND_VERSION: ${{ needs.check-versions.outputs.backend-version }}
         run: |
           echo "Uploading backend v$BACKEND_VERSION to Lambda..."
           echo "aws lambda update-function-code --function-name my-function --zip-file fileb64://package.zip"
@@ -218,7 +221,7 @@ jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [publish, build-frontend, build-backend]
+    needs: [publish, check-versions]
     permissions:
       contents: write
     steps:
@@ -237,8 +240,9 @@ jobs:
 
       - name: Generate release tag
         env:
-          FRONTEND_VERSION: ${{ needs.build-frontend.outputs.version }}
-          BACKEND_VERSION: ${{ needs.build-backend.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FRONTEND_VERSION: ${{ needs.check-versions.outputs.frontend-version }}
+          BACKEND_VERSION: ${{ needs.check-versions.outputs.backend-version }}
         run: |
           # Determine release tag (release-YYYY-MM-DD-N)
           DATE=$(date -u +%Y-%m-%d)
@@ -259,11 +263,11 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FRONTEND_VERSION: ${{ needs.build-frontend.outputs.version }}
-          BACKEND_VERSION: ${{ needs.build-backend.outputs.version }}
+          FRONTEND_VERSION: ${{ needs.check-versions.outputs.frontend-version }}
+          BACKEND_VERSION: ${{ needs.check-versions.outputs.backend-version }}
         run: |
           gh release create "$RELEASE_TAG" \
             "$RELEASE_TAG.zip" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$RELEASE_TAG" \
-            --notes "Frontend: v${FRONTEND_VERSION} | Backend: v${BACKEND_VERSION} | Commit: ${GITHUB_SHA:0:7}"
+            --notes "Frontend: ${FRONTEND_VERSION} | Backend: ${BACKEND_VERSION} | Commit: ${GITHUB_SHA:0:7}"
