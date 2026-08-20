@@ -101,6 +101,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Download release artifacts
+        if: inputs.action == 'apply'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Downloading release artifacts..."
+          gh release download --repo ${{ github.repository }} --pattern "*.zip" --dir output
+          unzip -o output/*.zip -d output/
+          cd output/release/backend-package && zip -r package.zip . && mv package.zip ../../package.zip
+
       - name: Terraform init
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform init
@@ -113,7 +123,7 @@ jobs:
           TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
           TF_VAR_project_bucket: ${{ secrets.AWS_PROJECT_S3_BUCKET }}
           TF_VAR_alert_email: ${{ vars.PERSONAL_EMAIL }}
-          TF_VAR_lambda_package_path: ${{ env.LAMBDA_PACKAGE_PATH }}
+          TF_VAR_lambda_package_path: ${{ github.workspace }}/${{ env.LAMBDA_PACKAGE_PATH }}
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform apply -auto-approve -no-color
 
@@ -125,14 +135,10 @@ jobs:
           TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
           TF_VAR_project_bucket: ${{ secrets.AWS_PROJECT_S3_BUCKET }}
           TF_VAR_alert_email: ${{ vars.PERSONAL_EMAIL }}
-          TF_VAR_lambda_package_path: ${{ env.LAMBDA_PACKAGE_PATH }}
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform destroy -auto-approve -no-color
 
       - name: Sync frontend to S3 (after apply)
         if: inputs.action == 'apply'
-        env:
-          FRONTEND_VERSION: ${{ steps.manifest.outputs.frontend_version }}
         run: |
-          echo "Syncing frontend v$FRONTEND_VERSION to S3..."
           echo "aws s3 sync ... (handled by Terraform/CloudFront)"
