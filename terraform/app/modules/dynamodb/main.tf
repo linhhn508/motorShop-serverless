@@ -22,3 +22,15 @@ resource "aws_dynamodb_table" "products" {
     projection_type = "ALL"
   }
 }
+
+resource "terraform_data" "dynamodb_script_seed" {
+  triggers_replace = {
+    file_hash = filesha256("${path.module}/assets/seed_data.json")
+  }
+
+  provisioner "local-exec" {
+    command = "python3 ${path.module}/assets/seed_job.py ${aws_dynamodb_table.products.name} ${path.module}/assets/seed_data.json"
+  }
+
+  depends_on = [aws_dynamodb_table.products]
+}
