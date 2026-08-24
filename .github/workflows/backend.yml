@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths: [backend/**]
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   lint:
@@ -44,6 +45,16 @@ jobs:
         with:
           python-version: 3.12
 
+      - name: Validate version format
+        working-directory: backend
+        run: |
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid semver in pyproject.toml: $VERSION"
+            exit 1
+          fi
+          echo "Backend version: $VERSION"
+
       - name: Install python 3.12
         run: uv python install 3.12
 
@@ -55,12 +66,17 @@ jobs:
         working-directory: backend
         run: uv run pytest tests/ -v
 
-      - name: Validate version format
+      - name: Build Lambda package
         working-directory: backend
         run: |
-          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Invalid semver in pyproject.toml: $VERSION"
-            exit 1
-          fi
-          echo "Backend version: $VERSION"
+          uv export --no-dev -o requirements.txt
+          pip install -r requirements.txt -t package/
+          cp -r app/ package/
+          rm -rf requirements.txt
+
+      - name: Upload backend build artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: backend-package
+          path: backend/package/
+          retention-days: 1
