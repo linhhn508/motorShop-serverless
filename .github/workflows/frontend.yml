@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths: [frontend/**]
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   ci:
@@ -38,3 +39,14 @@ jobs:
             exit 1
           fi
           echo "Frontend version: $VERSION"
+
+      - name: Build React app
+        run: npm run build
+        working-directory: frontend
+
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 1
