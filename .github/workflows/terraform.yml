@@ -30,7 +30,7 @@ permissions:
 env:
   AWS_REGION: ap-southeast-1
   TF_WORKING_DIR: terraform/app
-  TF_VAR_lambda_package_path: ../output/package.zip
+  TF_VAR_lambda_package_path: ../../output/package.zip
   TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
   TF_VAR_admin_username: ${{ secrets.ADMIN_USERNAME }}
   TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
