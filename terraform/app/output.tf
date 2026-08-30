@@ -5,3 +5,7 @@ output "cloudfront_domain" {
 output "api_endpoint" {
   value = module.apigateway.api_endpoint
 }
+
+output "web_domain_name" {
+  value = "https://${var.web_domain_name}"
+}

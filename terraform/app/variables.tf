@@ -29,6 +29,15 @@ variable "admin_password" {
   sensitive = true
 }
 
+variable "delegation_set_id" {
+  type      = string
+  sensitive = true
+}
+
+variable "web_domain_name" {
+  type = string
+}
+
 variable "project_bucket" {
   type = string
 }

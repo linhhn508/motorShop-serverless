@@ -51,6 +51,7 @@ locals {
   api_domain = regex("^https?://([^/]+)", module.apigateway.api_endpoint)[0]
 }
 
+# ---- Need to have SSL/TLS in ACM first, for Cloudfront require import in us-east-1 ----
 
 module "cloudfront" {
   source                              = "./modules/cloudfront"
@@ -61,4 +62,14 @@ module "cloudfront" {
   project_bucket_regional_domain_name = data.aws_s3_bucket.project.bucket_regional_domain_name
   apigateway_url                      = local.api_domain
   apigateway_stage_name               = module.apigateway.stage_name
+  web_domain_name                     = var.web_domain_name
+}
+
+module "route53" {
+  source               = "./modules/route53"
+  delegation_set_id    = var.delegation_set_id
+  distribution_name    = module.cloudfront.distribution_domain_name
+  distribution_zone_id = module.cloudfront.distribution_zone_id
+  web_domain_name      = var.web_domain_name
+  distribution_aliases = module.cloudfront.distribution_aliases
 }

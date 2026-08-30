@@ -25,3 +25,7 @@ variable "apigateway_url" {
 variable "apigateway_stage_name" {
   type = string
 }
+
+variable "web_domain_name" {
+  type = string
+}

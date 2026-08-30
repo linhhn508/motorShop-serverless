@@ -21,12 +21,21 @@ resource "aws_cloudfront_function" "strip_images_prefix" {
   EOF
 }
 
+data "aws_acm_certificate" "my_domain" {
+  domain   = var.web_domain_name
+  statuses = ["ISSUED"]
+  # Cloudfont require SSL/TLS certifacte must in created in us-east-1
+  region = "us-east-1"
+}
+
+
 # --- CloudFront Distribution ---
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
   is_ipv6_enabled     = true
   default_root_object = "index.html"
   comment             = "${var.project_name} distribution"
+  aliases             = [var.web_domain_name]
   price_class         = "PriceClass_200"
 
   # Origin 1: Frontend S3 bucket (default)
@@ -145,8 +154,16 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
+
+  # ----- Default Cloudfront SSL/TLS certificate -----
+  # viewer_certificate {
+  #   cloudfront_default_certificate = true
+  # }
+
+  # ----- Use SSL/TLS certificate from ACM -----
   viewer_certificate {
-    cloudfront_default_certificate = true
+    acm_certificate_arn = data.aws_acm_certificate.my_domain.arn
+    ssl_support_method  = "sni-only"
   }
 
   tags = {
