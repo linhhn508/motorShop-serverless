@@ -30,7 +30,13 @@ permissions:
 env:
   AWS_REGION: ap-southeast-1
   TF_WORKING_DIR: terraform/app
-  LAMBDA_PACKAGE_PATH: output/package.zip
+  TF_VAR_lambda_package_path: output/package.zip
+  TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+  TF_VAR_admin_username: ${{ secrets.ADMIN_USERNAME }}
+  TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
+  TF_VAR_project_bucket: ${{ secrets.AWS_PROJECT_S3_BUCKET }}
+  TF_VAR_alert_email: ${{ vars.PERSONAL_EMAIL }}
+  TF_VAR_web_domain_name: ${{ secrets.WEB_DOMAIN_NAME }}
 
 jobs:
   format:
@@ -53,6 +59,8 @@ jobs:
     name: Terraform Plan
     runs-on: ubuntu-latest
     needs: format
+    outputs:
+      reusable-delegation-set-id: ${{ steps.get_reusable_delegation_set.outputs.delegation_set_id }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -73,15 +81,17 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform init
 
+      - name: Get Route53 reusable delegation set ID
+        id: get_reusable_delegation_set
+        run: |
+          DELEGATION_SET_ID=$(aws route53 list-reusable-delegation-sets --query "DelegationSets[?CallerReference=='motorShop_serverless_delegation_set']" --output json | jq -r '.[].Id  | split("/") | last')
+          echo "delegation_set_id=$DELEGATION_SET_ID" >> "$GITHUB_OUTPUT"
+          echo "Reusable delegation set ID: $DELEGATION_SET_ID"
+
       - name: Terraform plan
-        env:
-          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
-          TF_VAR_admin_username: ${{ secrets.ADMIN_USERNAME }}
-          TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
-          TF_VAR_project_bucket: ${{ secrets.AWS_PROJECT_S3_BUCKET }}
-          TF_VAR_alert_email: ${{ vars.PERSONAL_EMAIL }}
-          TF_VAR_lambda_package_path: ${{ env.LAMBDA_PACKAGE_PATH }}
         working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_delegation_set_id: ${{ steps.get_reusable_delegation_set.outputs.delegation_set_id }}
         run: terraform plan -no-color
 
 
@@ -130,25 +140,16 @@ jobs:
 
       - name: Terraform apply
         if: inputs.action == 'apply'
-        env:
-          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
-          TF_VAR_admin_username: ${{ secrets.ADMIN_USERNAME }}
-          TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
-          TF_VAR_project_bucket: ${{ secrets.AWS_PROJECT_S3_BUCKET }}
-          TF_VAR_alert_email: ${{ vars.PERSONAL_EMAIL }}
-          TF_VAR_lambda_package_path: ${{ github.workspace }}/${{ env.LAMBDA_PACKAGE_PATH }}
         working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_delegation_set_id: ${{ needs.plan.outputs.reusable-delegation-set-id }}
         run: terraform apply -auto-approve -no-color
 
       - name: Terraform destroy
         if: inputs.action == 'destroy'
-        env:
-          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
-          TF_VAR_admin_username: ${{ secrets.ADMIN_USERNAME }}
-          TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
-          TF_VAR_project_bucket: ${{ secrets.AWS_PROJECT_S3_BUCKET }}
-          TF_VAR_alert_email: ${{ vars.PERSONAL_EMAIL }}
         working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_delegation_set_id: ${{ needs.plan.outputs.reusable-delegation-set-id }}
         run: terraform destroy -auto-approve -no-color
 
       - name: Sync frontend to S3 (after apply)
