@@ -36,7 +36,7 @@ env:
   TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
   TF_VAR_project_bucket: ${{ secrets.AWS_PROJECT_S3_BUCKET }}
   TF_VAR_alert_email: ${{ vars.PERSONAL_EMAIL }}
-  TF_VAR_web_domain_name: ${{ secrets.WEB_DOMAIN_NAME }}
+  TF_VAR_web_domain_name: linhhn508.qd.je
 
 jobs:
   format:
