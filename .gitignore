@@ -20,6 +20,6 @@ frontend/dist/
 
 # Lambda package
 backend/package.zip
-
+output/
 # Env
 .env
